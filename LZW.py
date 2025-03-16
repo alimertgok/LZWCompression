@@ -20,6 +20,12 @@ class LZWCoding:
       # initialize the code length as None 
       # (the actual value is determined based on the compressed data)
       self.codelength = None
+      self.entropy = None
+      self.avg_code_length = None
+      self.compression_ratio = None
+      self.input_size = None
+      self.compressed_size = None
+      self.difference = None
 
 
    def compute_difference_image(self, img_array):
@@ -70,7 +76,12 @@ class LZWCoding:
       current_directory = os.path.dirname(os.path.realpath(__file__))
 
       # Define input and output file paths
-      input_file = self.filename + '.txt' if self.data_type == "text" else self.filename
+      if self.data_type == "text" and self.filename.endswith(".txt"):
+         input_file = self.filename  # Zaten doğru dosya adı
+      elif self.data_type == "text":
+         input_file = self.filename + ".txt"
+      else:
+         input_file = self.filename
       input_path = os.path.join(current_directory, input_file)
       output_file = self.filename + '.bin'
       output_path = os.path.join(current_directory, output_file)
@@ -87,7 +98,6 @@ class LZWCoding:
          # Open the grayscale image using your function
          img = readPILimg(input_path)
          img_gray = color2gray(img)  # Convert to grayscale
-         img_gray.show()
          img_array = PIL2np(img_gray)  # Convert to numpy array
          nrows, ncols = img_array.shape
          print(f"Original Image Dimensions: {nrows} x {ncols}")
@@ -109,8 +119,6 @@ class LZWCoding:
       elif self.data_type == "colorimage":
          # Open the RGB image using your function
          img = readPILimg(input_path)
-
-         img.show()
 
          # Extract RGB channel values using your functions
          red = red_values(img)
@@ -163,9 +171,14 @@ class LZWCoding:
       uncompressed_size = len(mytext)
       compressed_size = len(byte_array)
       compression_ratio = uncompressed_size / compressed_size if compressed_size != 0 else 0
+      difference = uncompressed_size - compressed_size
 
       # Compute compressed entropy
-      compressed_entropy = self.calculate_entropy(np.array(encoded_text_as_integers))
+      compressed_entropy = self.calculate_entropy(np.array(encoded_text_as_integers)) if self.data_type != "text" else "N/A"
+
+      self.update_stats(compressed_entropy, self.codelength, compression_ratio,
+                        uncompressed_size, compressed_size,
+                        difference, self.data_type)
 
       print(f"{input_file} has been compressed into {output_file}.")
       print(f"Uncompressed Size: {uncompressed_size:,d} bytes")
@@ -177,6 +190,15 @@ class LZWCoding:
       # print(f"Compressed Entropy: {compressed_entropy:.2f} bits/pixel")
 
       return output_path
+
+   def update_stats(self, entropy, avg_code_length, compression_ratio, input_size, compressed_size, difference, data_type):
+      self.entropy = entropy
+      self.avg_code_length = avg_code_length
+      self.compression_ratio = compression_ratio
+      self.input_size = input_size
+      self.compressed_size = compressed_size
+      self.difference = difference
+      self.data_type = data_type
 
    # A method that encodes a text input into a list of integer values by using
    # the LZW compression algorithm and returns the resulting list.
@@ -292,15 +314,16 @@ class LZWCoding:
       current_directory = os.path.dirname(os.path.realpath(__file__))
 
       # Define input and output file paths
-      input_file = self.filename + '.bin'
+      if self.filename.endswith(".bin"):
+         input_file = self.filename  # Doğru dosya adı
+      else:
+         input_file = self.filename + ".bin"
       input_path = os.path.join(current_directory, input_file)
       # Determine the output file extension dynamically
       if self.data_type == "text":
-         output_file = self.filename + '_decompressed.txt'
-
+         output_file = self.filename.replace(".bin", "") + "_decompressed.txt"
       elif self.data_type in ["graylevelimage", "colorimage"]:
-         output_file = self.filename + '_decompressed.bmp'
-
+         output_file = self.filename.replace(".bin", "") + "_decompressed.bmp"
       else:
          print("Unknown data type!")
          return None
@@ -335,7 +358,7 @@ class LZWCoding:
 
       elif self.data_type == "graylevelimage":
          # Open the original image to get its dimensions
-         orgImageFile = readPILimg(self.filename)  # Using your function
+         orgImageFile = readPILimg(self.filename.replace(".bin", ""))
          nrows, ncols = orgImageFile.size[1], orgImageFile.size[0]
 
          # Convert characters back to integer values
@@ -357,12 +380,11 @@ class LZWCoding:
 
          # Convert to a grayscale image and save
          img = np2PIL(restored_image)
-         img.show()
          img.save(output_path)
 
       elif self.data_type == "colorimage":
          # Open the original image to get its dimensions
-         orgImageFile = readPILimg(self.filename)  # Using your function
+         orgImageFile = readPILimg(self.filename.replace(".bin", ""))
          nrows, ncols = orgImageFile.size[1], orgImageFile.size[0]
 
          # Split decompressed text into RGB channels
@@ -390,8 +412,7 @@ class LZWCoding:
          restored_image = merge_image(red_img, green_img, blue_img)
 
          # Save and show the restored image
-         restored_image.save(f"{self.filename}_decompressed.bmp")
-         restored_image.show()
+         restored_image.save(output_path)
 
       else:
          print("Unknown data type!")
